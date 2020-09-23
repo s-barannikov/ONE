@@ -20,11 +20,13 @@
 #include "mir/ops/ConstantOp.h"
 #include "mir/ops/Conv2DOp.h"
 #include "mir/ops/MulOp.h"
+#include "mir/ops/ReshapeOp.h"
 #include "mir/Graph.h"
 #include "mir/Tensor.h"
 #include "mir/Index.h"
 #include "mir/TensorVariant.h"
 #include "mir/ShapeRange.h"
+#include "MirInterpreter.h"
 
 #include <algorithm>
 
@@ -48,7 +50,7 @@ using Edge = pair<Operation *, Operation *>;
 ops::ConstantOp *getSecondInputAsConst(Operation *op)
 {
   assert(op->getType() == OpType::add || op->getType() == OpType::mul ||
-         op->getType() == OpType::conv2D);
+         op->getType() == OpType::conv2D || op->getType() == OpType::deConv2D);
   return dynamic_cast<ops::ConstantOp *>(op->getInput(1)->getNode());
 }
 
@@ -88,6 +90,7 @@ vector<Edge> findSuccessiveOpsWithConstWeights(Graph *g, OpType first_op_type,
   return matches;
 }
 
+#if 0
 /**
  * This function merges two ConstantOp into new one, by elementwise multiplication or addition
  * If first ConstantOp rank > 1, second one broadcasting to first by axis=0
@@ -131,6 +134,8 @@ Operation *mergeConstantOps(Graph *g, const ops::ConstantOp *const1_op,
   return g->create<ops::ConstantOp>(new_const_val);
 }
 
+#endif
+
 // TODO: support 'DepthwiseConv'->'Mul'
 /**
  * This function fuses some successive operations with constant weights into one:
@@ -165,6 +170,8 @@ bool fuseSuccessiveOps(Graph *g)
   successive_ops.insert(successive_ops.end(), add_add_vec.begin(), add_add_vec.end());
   auto conv_mul_vec = findSuccessiveOpsWithConstWeights(g, OpType::conv2D, OpType::mul);
   successive_ops.insert(successive_ops.end(), conv_mul_vec.begin(), conv_mul_vec.end());
+  auto tconv_mul_vec = findSuccessiveOpsWithConstWeights(g, OpType::deConv2D, OpType::mul);
+  successive_ops.insert(successive_ops.end(), tconv_mul_vec.begin(), tconv_mul_vec.end());
 
   for (auto &edge : successive_ops)
   {
@@ -172,10 +179,42 @@ bool fuseSuccessiveOps(Graph *g)
     auto const2_op = getSecondInputAsConst(edge.second);
     assert(const1_op && const2_op);
 
-    // Create new constant operation and copy first successive operation
-    auto new_const_op = mergeConstantOps(g, const1_op, const2_op, edge.second->getType());
-    auto first_op_input = edge.first->getInput(0);
-    auto new_op = g->copyOpWithInputs(edge.first, {first_op_input, new_const_op->getOutput(0)});
+    mir::Operation *new_op = nullptr;
+    if (edge.first->getType() == mir::Operation::Type::conv2D)
+    {
+      auto *old_weights = const1_op->getOutput(0);
+      auto *old_coeff = const2_op->getOutput(0);
+
+      const int32_t num_channels = old_weights->getShape().dim(0); // OHWI
+      auto *new_weights_op = g->create<ops::ReshapeOp>(old_coeff, Shape{num_channels, 1, 1, 1});
+      new_weights_op = foldConstants(g, new_weights_op);
+      new_weights_op = g->create<ops::MulOp>(old_weights, new_weights_op->getOutput(0));
+      new_weights_op = foldConstants(g, new_weights_op);
+
+      new_op =
+          g->copyOpWithInputs(edge.first, {edge.first->getInput(0), new_weights_op->getOutput(0)});
+    }
+    else if (edge.first->getType() == mir::Operation::Type::deConv2D)
+    {
+      auto *old_weights = const1_op->getOutput(0);
+      auto *old_coeff = const2_op->getOutput(0);
+
+      const int32_t num_channels = old_weights->getShape().dim(2); // HWOI
+      auto *new_weights_op = g->create<ops::ReshapeOp>(old_coeff, Shape{1, 1, num_channels, 1});
+      new_weights_op = foldConstants(g, new_weights_op);
+      new_weights_op = g->create<ops::MulOp>(old_weights, new_weights_op->getOutput(0));
+      new_weights_op = foldConstants(g, new_weights_op);
+
+      new_op =
+          g->copyOpWithInputs(edge.first, {edge.first->getInput(0), new_weights_op->getOutput(0)});
+    }
+    else
+    {
+      auto new_const_op = g->copyOpWithInputs(edge.second, {const1_op->getOutput(0), const2_op->getOutput(0)});
+      new_const_op = foldConstants(g, new_const_op);
+      auto first_op_input = edge.first->getInput(0);
+      new_op = g->copyOpWithInputs(edge.first, {first_op_input, new_const_op->getOutput(0)});
+    }
 
     // Replace second successive operation with new one and remove old nodes
     g->replaceNode(edge.second, new_op);
@@ -216,7 +255,8 @@ bool sinkAddThroughMul(Graph *g)
     auto old_add_input = old_add_op->getInput(0);
     auto new_mul_op =
         g->copyOpWithInputs(old_mul_op, {old_add_input, ols_mul_const_op->getOutput(0)});
-    auto new_add_const_op = mergeConstantOps(g, old_add_const_op, ols_mul_const_op, OpType::mul);
+    auto new_add_const_op = g->create<ops::MulOp>(old_add_const_op->getOutput(0), ols_mul_const_op->getOutput(0));
+    new_add_const_op = foldConstants(g, new_add_const_op);
     auto new_add_op =
         g->copyOpWithInputs(old_add_op, {new_mul_op->getOutput(0), new_add_const_op->getOutput(0)});
 

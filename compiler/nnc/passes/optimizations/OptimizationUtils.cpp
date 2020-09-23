@@ -15,6 +15,9 @@
  */
 #include "passes/optimizations/OptimizationUtils.h"
 
+#include "mir/ops/ConstantOp.h"
+#include "MirInterpreter.h"
+
 namespace nnc
 {
 namespace opt_util
@@ -49,6 +52,20 @@ void removeNodeIfUnused(mir::Graph *g, mir::Operation *op)
 {
   if (op->getOutput(0)->getUses().empty())
     g->removeNode(op);
+}
+
+mir::Operation *foldConstants(mir::Graph *graph, mir::Operation *op)
+{
+  mir_interpreter::MIRInterpreter interpreter;
+  for (mir::Operation::Output *out : op->getInputs())
+  {
+    auto *constant = dynamic_cast<mir::ops::ConstantOp *>(out->getNode());
+    interpreter.setTensor(out, constant->getValue());
+  }
+  op->accept(&interpreter);
+  const mir::TensorVariant &output = interpreter.getTensor(op->getOutput(0));
+
+  return graph->create<mir::ops::ConstantOp>(output);
 }
 
 } // namespace opt_util

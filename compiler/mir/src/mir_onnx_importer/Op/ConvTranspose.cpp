@@ -97,9 +97,6 @@ void convertConvTransposeV1(const onnx::NodeProto &onnx_node, ConverterContext *
   }
   else
   {
-    // TODO This code was not tested.
-    throw std::runtime_error(
-        "ConvTranspose: absence of attribute 'output_shape' is not supported.");
     std::vector<std::int32_t> padding_before(num_spatial_dims, 0);
     std::vector<std::int32_t> padding_after(num_spatial_dims, 0);
     if (const auto *pads_attr = findAttribute(onnx_node, "pads"))
