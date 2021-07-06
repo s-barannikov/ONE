@@ -30,6 +30,8 @@ if(NNC_FRONTEND_ONNX_ENABLED)
   target_link_libraries(${NNC_TARGET_EXECUTABLE} PRIVATE mir_onnx_importer)
 endif()
 
+target_link_libraries(${NNC_TARGET_EXECUTABLE} PRIVATE mir2loco exo)
+
 add_subdirectory(support)
 add_subdirectory(pass)
 add_subdirectory(passes)

@@ -35,6 +35,8 @@
 #include "Definitions.h"
 #include "Options.h"
 #include "Driver.h"
+#include "mir2loco.h"
+#include "exo/TFLExporter.h"
 
 #ifdef NNC_FRONTEND_CAFFE2_ENABLED
 #include <caffe2_importer.h>
@@ -207,6 +209,24 @@ void Driver::registerOptimizationPass()
 
 void Driver::runDriver()
 {
+  auto graph = importModel();
+
+  DeadCodeElimination().run(graph.get());   // cleanup after import
+  FuseArithmeticOps().run(graph.get());     // fuse BatchNorm
+  LowerConv2D().run(graph.get());           // convert grouped Conv2D to DepthwiseConv2D
+  ConstantFoldTranspose().run(graph.get()); // remove Transpose of DepthwiseConv2D weights
+  DeadCodeElimination().run(graph.get());   // cleanup
+  DataFormatSwitcher(mir::DataFormat::NHWC).run(graph.get()); // enforce NHWC data format
+  SinkTranspose().run(graph.get());                           // sink inserted Transposes
+  SinkTranspose().run(graph.get());                           // twice
+  CombineTransposes().run(graph.get());                       // annihilate Transposes
+  DeadCodeElimination().run(graph.get());                     // cleanup
+
+  mir2loco::Transformer transformer;
+  auto loco_graph = transformer.transform(graph.get());
+  exo::TFLExporter(loco_graph.get()).dumpToFile(cli::artifactName.getRawValue().c_str());
+  return;
+
   registerOptimizationPass();
   registerBackendSpecificPasses();
 

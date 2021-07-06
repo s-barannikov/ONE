@@ -170,8 +170,8 @@ template <class LatterT> locoex::TFLConst *Fuser<LatterT>::create_fused_bias_con
   assert(bias->dtype() == loco::DataType::FLOAT32 &&
          _const_node->dtype() == loco::DataType::FLOAT32);
 
-  assert(bias->rank() == 1 && _const_node->rank() == 1);
-  assert(bias->dim(0) == _const_node->dim(0));
+  //  assert(bias->rank() == 1 && _const_node->rank() == 1);
+  //  assert(bias->dim(0) == _const_node->dim(0));
 
   // build a new bias const
   auto new_bias = _graph->nodes()->create<locoex::TFLConst>();
@@ -262,7 +262,8 @@ struct Collector final : public locoex::TFLNodeMutableVisitor<void>
         loco::shape_get(as_loco_node(former)).template as<loco::TensorShape>().dim(3).value();
     auto const_shape = loco::shape_get(const_node).template as<loco::TensorShape>();
 
-    if (const_shape.rank() == 1 and const_shape.dim(0) == depth)
+    if ((const_shape.rank() == 1 and const_shape.dim(0) == depth) ||
+        (const_shape.rank() == 4 && const_shape == loco::TensorShape{1, 1, 1, depth}))
     {
       candidates.insert(latter);
     }

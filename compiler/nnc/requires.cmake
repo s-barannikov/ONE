@@ -1,3 +1,5 @@
 require("adtidas")
 require("mir")
 require("mir-interpreter")
+require("mir2loco")
+require("exo")

@@ -29,6 +29,7 @@
 #include "mir/ops/MulOp.h"
 #include "mir/ops/ReluOp.h"
 #include "mir/ops/ReshapeOp.h"
+#include "mir/ops/SigmoidOp.h"
 #include "mir/ops/SoftmaxOp.h"
 #include "mir/ops/SubOp.h"
 #include "mir/ops/TransposeOp.h"
@@ -664,6 +665,12 @@ void Transformer::visit(mir::ops::ReshapeOp &op)
   setupShape(out_shape, reshape_node);
   // Add to map
   _mir2loco_map.emplace(op.getOutput(0), reshape_node);
+}
+
+void Transformer::visit(mir::ops::SigmoidOp &op)
+{
+  loco::Node *input = _mir2loco_map.at(op.getInput(0));
+  _mir2loco_map.emplace(op.getOutput(0), input);
 }
 
 void Transformer::visit(mir::ops::SoftmaxOp &op)

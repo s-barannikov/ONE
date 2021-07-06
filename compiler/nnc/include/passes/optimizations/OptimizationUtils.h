@@ -34,6 +34,9 @@ void swapAdjacent(mir::Graph *g, mir::Operation *top, mir::Operation *bottom);
 
 // TODO: this function and it's usages should be removed, after DCE optimization will be implemented
 void removeNodeIfUnused(mir::Graph *g, mir::Operation *op);
+
+mir::Operation *foldConstants(mir::Graph *graph, mir::Operation *op);
+
 } // namespace opt_util
 } // namespace nnc
 

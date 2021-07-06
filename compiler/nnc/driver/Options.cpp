@@ -89,7 +89,7 @@ Option<std::string>
            overview("select target language to emit for given architecture."
                     "Valid values are '" NNC_TARGET_ARM_CPP "', '" NNC_TARGET_X86_CPP
                     "', '" NNC_TARGET_ARM_GPU_CPP "', '" NNC_TARGET_INTERPRETER "'"),
-           std::string(), optional(false),
+           std::string(), optional(true),
            optvalues(NNC_TARGET_ARM_CPP "," NNC_TARGET_X86_CPP "," NNC_TARGET_ARM_GPU_CPP
                                         "," NNC_TARGET_INTERPRETER),
            nullptr, separators("="));

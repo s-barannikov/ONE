@@ -42,6 +42,7 @@ public:
   void visit(mir::ops::OutputOp &op) override;
   void visit(mir::ops::ReluOp &op) override;
   void visit(mir::ops::ReshapeOp &op) override;
+  void visit(mir::ops::SigmoidOp &op) override;
   void visit(mir::ops::SoftmaxOp &op) override;
   void visit(mir::ops::SubOp &op) override;
   void visit(mir::ops::TransposeOp &op) override;

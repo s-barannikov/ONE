@@ -559,7 +559,7 @@ public:
     for (uint32_t out_axis = 0; out_axis < output_shape.rank(); out_axis++)
     {
       auto new_dim = perm_node->template at<loco::DataType::S32>(out_axis);
-      output_shape.dim(new_dim) = input_shape.dim(out_axis);
+      output_shape.dim(out_axis) = input_shape.dim(new_dim);
     }
 
     return output_shape;
